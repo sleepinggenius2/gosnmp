@@ -762,7 +762,7 @@ func (x *GoSNMP) unmarshalVBL(packet []byte, response *SnmpPacket) error {
 		}
 		valueLength, _ := parseLength(packet[cursor:])
 		cursor += valueLength
-		response.Variables = append(response.Variables, SnmpPDU{oidStr, v.Type, v.Value, x.Logger})
+		response.Variables = append(response.Variables, SnmpPDU{oidStr, v.Type, v.Value, x.Logger, oid})
 	}
 	return nil
 }

@@ -125,6 +125,9 @@ type SnmpPDU struct {
 
 	// Logger implements the Logger interface
 	Logger Logger
+
+	// The oid as a slice of ints
+	Oid []int
 }
 
 // Asn1BER is the type of the SNMP PDU
@@ -279,7 +282,7 @@ func (x *GoSNMP) Get(oids []string) (result *SnmpPacket, err error) {
 	// convert oids slice to pdu slice
 	var pdus []SnmpPDU
 	for _, oid := range oids {
-		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger})
+		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger, nil})
 	}
 	// build up SnmpPacket
 	packetOut := x.mkSnmpPacket(GetRequest, pdus, 0, 0)
@@ -309,7 +312,7 @@ func (x *GoSNMP) GetNext(oids []string) (result *SnmpPacket, err error) {
 	// convert oids slice to pdu slice
 	var pdus []SnmpPDU
 	for _, oid := range oids {
-		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger})
+		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger, nil})
 	}
 
 	// Marshal and send the packet
@@ -331,7 +334,7 @@ func (x *GoSNMP) GetBulk(oids []string, nonRepeaters uint8, maxRepetitions uint8
 	// convert oids slice to pdu slice
 	var pdus []SnmpPDU
 	for _, oid := range oids {
-		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger})
+		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger, nil})
 	}
 
 	// Marshal and send the packet
