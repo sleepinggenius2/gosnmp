@@ -58,7 +58,7 @@ RequestLoop:
 				x.Logger.Printf("BulkWalk terminated with type 0x%x", v.Type)
 				break RequestLoop
 			}
-			if !strings.HasPrefix(v.Name, rootOid) {
+			if !strings.HasPrefix(v.Name, rootOid + ".") {
 				// Not in the requested root range.
 				// if this is the first request, and the first variable in that request
 				// and this condition is triggered - the first result is out of range
