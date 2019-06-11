@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -210,6 +211,12 @@ const (
 	InconsistentName                     // The name in a variable binding specifies a variable that does not exist.
 )
 
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		return new([rxBufSize]byte)
+	},
+}
+
 //
 // Public Functions (main interface)
 //
@@ -261,7 +268,7 @@ func (x *GoSNMP) connect(networkSuffix string) error {
 	// RequestID is Integer32 from SNMPV2-SMI and uses all 32 bits
 	x.requestID = x.random.Uint32()
 
-	x.rxBuf = new([rxBufSize]byte)
+	x.rxBuf = bufPool.Get().(*[rxBufSize]byte)
 
 	return nil
 }
@@ -273,6 +280,11 @@ func (x *GoSNMP) netConnect() error {
 	addr := net.JoinHostPort(x.Target, strconv.Itoa(int(x.Port)))
 	x.Conn, err = net.DialTimeout(x.Transport, addr, x.Timeout)
 	return err
+}
+
+func (x *GoSNMP) Close() error {
+	bufPool.Put(x.rxBuf)
+	return x.Conn.Close()
 }
 
 func (x *GoSNMP) validateParameters() error {
