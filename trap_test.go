@@ -17,7 +17,7 @@ import (
 const (
 	trapTestAddress = "127.0.0.1"
 
-	// this is bad. Listen and Connect expect different address formats
+	// TODO this is bad. Listen and Connect expect different address formats
 	// so we need an int version and a string version - they should be the same.
 	trapTestPort       = 9162
 	trapTestPortString = "9162"
@@ -46,7 +46,7 @@ var testsUnmarshalTrap = []struct {
 				UserName:                 "myuser",
 				AuthenticationProtocol:   MD5,
 				AuthenticationPassphrase: "mypassword",
-				Logger: log.New(os.Stdout, "", 0),
+				Logger:                   log.New(os.Stdout, "", 0),
 			},
 		},
 	},
@@ -211,7 +211,7 @@ func TestSendTrapBasic(t *testing.T) {
 	// wait for response from handler
 	select {
 	case <-done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for trap to be received")
 	}
 
@@ -361,7 +361,7 @@ func TestSendV1Trap(t *testing.T) {
 	// wait for response from handler
 	select {
 	case <-done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for trap to be received")
 	}
 

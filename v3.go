@@ -1,5 +1,3 @@
-package gosnmp
-
 // Copyright 2012-2018 The GoSNMP Authors. All rights reserved.  Use of this
 // source code is governed by a BSD-style license that can be found in the
 // LICENSE file.
@@ -7,6 +5,8 @@ package gosnmp
 // Copyright 2009 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+
+package gosnmp
 
 import (
 	"bytes"
@@ -55,6 +55,9 @@ func (x *GoSNMP) validateParametersV3() error {
 	// update following code if you implement a new security model
 	if x.SecurityModel != UserSecurityModel {
 		return fmt.Errorf("The SNMPV3 User Security Model is the only SNMPV3 security model currently implemented")
+	}
+	if x.SecurityParameters == nil {
+		return fmt.Errorf("SNMPV3 SecurityParameters must be set")
 	}
 
 	return x.SecurityParameters.validate(x.MsgFlags)
@@ -297,7 +300,7 @@ func (x *GoSNMP) unmarshalV3Header(packet []byte,
 	response *SnmpPacket) (int, error) {
 
 	if PDUType(packet[cursor]) != Sequence {
-		return 0, fmt.Errorf("Invalid SNMPV3 Header\n")
+		return 0, fmt.Errorf("invalid SNMPV3 Header")
 	}
 
 	_, cursorTmp := parseLength(packet[cursor:])
@@ -312,13 +315,16 @@ func (x *GoSNMP) unmarshalV3Header(packet []byte,
 		response.MsgID = uint32(MsgID)
 		x.logPrintf("Parsed message ID %d", MsgID)
 	}
-	// discard msg max size
-	_, count, err = parseRawField(packet[cursor:], "maxMsgSize")
+
+	rawMsgMaxSize, count, err := parseRawField(packet[cursor:], "msgMaxSize")
 	if err != nil {
-		return 0, fmt.Errorf("Error parsing SNMPV3 maxMsgSize: %s", err.Error())
+		return 0, fmt.Errorf("Error parsing SNMPV3 msgMaxSize: %s", err.Error())
 	}
 	cursor += count
-	// discard msg max size
+	if MsgMaxSize, ok := rawMsgMaxSize.(int); ok {
+		response.MsgMaxSize = uint32(MsgMaxSize)
+		x.logPrintf("Parsed message max size %d", MsgMaxSize)
+	}
 
 	rawMsgFlags, count, err := parseRawField(packet[cursor:], "msgFlags")
 	if err != nil {
@@ -340,39 +346,43 @@ func (x *GoSNMP) unmarshalV3Header(packet []byte,
 		x.logPrintf("Parsed security model %d", SecModel)
 	}
 
-	if PDUType(packet[cursor]) != OctetString {
-		return 0, fmt.Errorf("Invalid SNMPV3 Security Parameters\n")
+	if PDUType(packet[cursor]) != PDUType(OctetString) {
+		return 0, fmt.Errorf("invalid SNMPV3 Security Parameters")
 	}
 	_, cursorTmp = parseLength(packet[cursor:])
 	cursor += cursorTmp
 
-	if response.SecurityParameters == nil {
-		return 0, fmt.Errorf("Unable to parse V3 packet - unknown security model")
+	if response.SecurityParameters != nil {
+		cursor, err = response.SecurityParameters.unmarshal(response.MsgFlags, packet, cursor)
+		if err != nil {
+			return 0, err
+		}
 	}
 
-	cursor, err = response.SecurityParameters.unmarshal(response.MsgFlags, packet, cursor)
-	if err != nil {
-		return 0, err
-	}
 	return cursor, nil
 }
 
 func (x *GoSNMP) decryptPacket(packet []byte, cursor int, response *SnmpPacket) ([]byte, int, error) {
 	var err error
+	var decrypted = false
+
 	switch PDUType(packet[cursor]) {
-	case OctetString:
+	case PDUType(OctetString):
 		// pdu is encrypted
 		packet, err = response.SecurityParameters.decryptPacket(packet, cursor)
 		if err != nil {
 			return nil, 0, err
 		}
+		decrypted = true
 		fallthrough
 	case Sequence:
-		// pdu is plaintext
+		// pdu is plaintext or has been decrypted
 		tlength, cursorTmp := parseLength(packet[cursor:])
-		// truncate padding that may have been included with
-		// the encrypted PDU
-		packet = packet[:cursor+tlength]
+		if decrypted {
+			// truncate padding that might have been included with
+			// the encrypted PDU
+			packet = packet[:cursor+tlength]
+		}
 		cursor += cursorTmp
 		rawContextEngineID, count, err := parseRawField(packet[cursor:], "contextEngineID")
 		if err != nil {
@@ -394,7 +404,7 @@ func (x *GoSNMP) decryptPacket(packet []byte, cursor int, response *SnmpPacket) 
 		}
 
 	default:
-		return nil, 0, fmt.Errorf("Error parsing SNMPV3 scoped PDU\n")
+		return nil, 0, fmt.Errorf("error parsing SNMPV3 scoped PDU")
 	}
 	return packet, cursor, nil
 }
