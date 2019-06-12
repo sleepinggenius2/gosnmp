@@ -19,6 +19,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/libp2p/go-reuseport"
 )
 
 const (
@@ -60,6 +62,9 @@ type GoSNMP struct {
 
 	// Set the number of retries to attempt within timeout.
 	Retries int
+
+	// Enable SO_REUSEADDR and SO_REUSEPORT
+	ReusePort bool
 
 	// Double timeout in each retry
 	ExponentialTimeout bool
@@ -278,7 +283,11 @@ func (x *GoSNMP) connect(networkSuffix string) error {
 func (x *GoSNMP) netConnect() error {
 	var err error
 	addr := net.JoinHostPort(x.Target, strconv.Itoa(int(x.Port)))
-	x.Conn, err = net.DialTimeout(x.Transport, addr, x.Timeout)
+	dialer := net.Dialer{Timeout: x.Timeout}
+	if x.ReusePort {
+		dialer.Control = reuseport.Control
+	}
+	x.Conn, err = dialer.Dial(x.Transport, addr)
 	return err
 }
 
