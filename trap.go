@@ -138,6 +138,7 @@ func (t *TrapListener) Listen(addr string) error {
 		t.Params = Default
 	}
 
+	// nolint:errcheck
 	t.Params.validateParameters()
 	/*
 		TODO returning an error causes TestSendTrapBasic() (and others) to hang
