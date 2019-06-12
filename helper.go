@@ -19,8 +19,8 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"strconv"
-	"strings"
+
+	"github.com/sleepinggenius2/gosmi/types"
 )
 
 // variable struct is used by decodeValue(), which is used for debugging
@@ -63,7 +63,8 @@ func Check(err error) {
 	}
 }
 
-func (x *GoSNMP) decodeValue(data []byte, msg string) (retVal *variable, err error) {
+func (x *GoSNMP) decodeValue(data []byte, msg string) (retVal *variable, length int, err error) {
+	var cursor int
 	retVal = new(variable)
 
 	// values matching this mask have the type in subsequent byte
@@ -76,40 +77,42 @@ func (x *GoSNMP) decodeValue(data []byte, msg string) (retVal *variable, err err
 	case Integer:
 		// 0x02. signed
 		x.logPrint("decodeValue: type is Integer")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		var ret int
 		var err error
 		if ret, err = parseInt(data[cursor:length]); err != nil {
 			x.logPrintf("%v:", err)
-			return retVal, fmt.Errorf("bytes: % x err: %v", data, err)
+			return nil, length, fmt.Errorf("bytes: % x err: %v", data, err)
 		}
 		retVal.Type = Integer
 		retVal.Value = ret
 	case OctetString:
 		// 0x04
 		x.logPrint("decodeValue: type is OctetString")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		retVal.Type = OctetString
 		retVal.Value = []byte(data[cursor:length])
 	case Null:
 		// 0x05
 		x.logPrint("decodeValue: type is Null")
+		length = 2
 		retVal.Type = Null
 		retVal.Value = nil
 	case ObjectIdentifier:
 		// 0x06
 		x.logPrint("decodeValue: type is ObjectIdentifier")
-		rawOid, _, err := parseRawField(data, "OID")
+		rawOid, oidLen, err := parseRawField(data, "OID")
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing OID Value: %s", err.Error())
+			return nil, oidLen, fmt.Errorf("Error parsing OID Value: %s", err.Error())
 		}
-		var oid []int
+		var oid types.Oid
 		var ok bool
-		if oid, ok = rawOid.([]int); !ok {
-			return nil, fmt.Errorf("unable to type assert rawOid |%v| to []int", rawOid)
+		if oid, ok = rawOid.(types.Oid); !ok {
+			return nil, oidLen, fmt.Errorf("unable to type assert rawOid |%v| to Oid", rawOid)
 		}
+		length = oidLen
 		retVal.Type = ObjectIdentifier
-		retVal.Value = oidToString(oid)
+		retVal.Value = oid
 	case IPAddress:
 		// 0x40
 		x.logPrint("decodeValue: type is IPAddress")
@@ -117,26 +120,28 @@ func (x *GoSNMP) decodeValue(data []byte, msg string) (retVal *variable, err err
 		switch data[1] {
 		case 0: // real life, buggy devices returning bad data
 			retVal.Value = nil
-			return retVal, nil
+			return retVal, 2, nil
 		case 4: // IPv4
 			if len(data) < 6 {
-				return nil, fmt.Errorf("not enough data for ipv4 address: %x", data)
+				return nil, 0, fmt.Errorf("not enough data for ipv4 address: %x", data)
 			}
+			length = 6
 			retVal.Value = net.IPv4(data[2], data[3], data[4], data[5]).String()
 		case 16: // IPv6
 			if len(data) < 18 {
-				return nil, fmt.Errorf("not enough data for ipv6 address: %x", data)
+				return nil, 0, fmt.Errorf("not enough data for ipv6 address: %x", data)
 			}
+			length = 18
 			d := make(net.IP, 16)
 			copy(d, data[2:17])
 			retVal.Value = d.String()
 		default:
-			return nil, fmt.Errorf("got ipaddress len %d, expected 4 or 16", data[1])
+			return nil, 0, fmt.Errorf("got ipaddress len %d, expected 4 or 16", data[1])
 		}
 	case Counter32:
 		// 0x41. unsigned
 		x.logPrint("decodeValue: type is Counter32")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		ret, err := parseUint(data[cursor:length])
 		if err != nil {
 			x.logPrintf("decodeValue: err is %v", err)
@@ -147,7 +152,7 @@ func (x *GoSNMP) decodeValue(data []byte, msg string) (retVal *variable, err err
 	case Gauge32:
 		// 0x42. unsigned
 		x.logPrint("decodeValue: type is Gauge32")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		ret, err := parseUint(data[cursor:length])
 		if err != nil {
 			x.logPrintf("decodeValue: err is %v", err)
@@ -158,7 +163,7 @@ func (x *GoSNMP) decodeValue(data []byte, msg string) (retVal *variable, err err
 	case TimeTicks:
 		// 0x43
 		x.logPrint("decodeValue: type is TimeTicks")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		ret, err := parseUint(data[cursor:length])
 		if err != nil {
 			x.logPrintf("decodeValue: err is %v", err)
@@ -169,14 +174,14 @@ func (x *GoSNMP) decodeValue(data []byte, msg string) (retVal *variable, err err
 	case Opaque:
 		// 0x44
 		x.logPrint("decodeValue: type is Opaque")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		opaqueData := data[cursor:length]
 		// recursively decode opaque data
-		return x.decodeValue(opaqueData, msg)
+		retVal, _, err = x.decodeValue(opaqueData, msg)
 	case Counter64:
 		// 0x46
 		x.logPrint("decodeValue: type is Counter64")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		ret, err := parseUint64(data[cursor:length])
 		if err != nil {
 			x.logPrintf("decodeValue: err is %v", err)
@@ -187,32 +192,36 @@ func (x *GoSNMP) decodeValue(data []byte, msg string) (retVal *variable, err err
 	case OpaqueFloat:
 		// 0x78
 		x.logPrint("decodeValue: type is OpaqueFloat")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		retVal.Type = OpaqueFloat
 		retVal.Value, err = parseFloat32(data[cursor:length])
 	case OpaqueDouble:
 		// 0x79
 		x.logPrint("decodeValue: type is OpaqueDouble")
-		length, cursor := parseLength(data)
+		length, cursor = parseLength(data)
 		retVal.Type = OpaqueDouble
 		retVal.Value, err = parseFloat64(data[cursor:length])
 	case NoSuchObject:
 		// 0x80
 		x.logPrint("decodeValue: type is NoSuchObject")
+		length = 2
 		retVal.Type = NoSuchObject
 		retVal.Value = nil
 	case NoSuchInstance:
 		// 0x81
 		x.logPrint("decodeValue: type is NoSuchInstance")
+		length = 2
 		retVal.Type = NoSuchInstance
 		retVal.Value = nil
 	case EndOfMibView:
 		// 0x82
 		x.logPrint("decodeValue: type is EndOfMibView")
+		length = 2
 		retVal.Type = EndOfMibView
 		retVal.Value = nil
 	default:
 		x.logPrintf("decodeValue: type %x isn't implemented", data[0])
+		length, _ = parseLength(data)
 		retVal.Type = UnknownType
 		retVal.Value = nil
 	}
@@ -358,7 +367,7 @@ func marshalLength(length int) ([]byte, error) {
 	return append(header, bufBytes...), nil
 }
 
-func marshalObjectIdentifier(oid []int) (ret []byte, err error) {
+func marshalObjectIdentifier(oid types.Oid) (ret []byte, err error) {
 	out := new(bytes.Buffer)
 	if len(oid) < 2 || oid[0] > 6 || oid[1] >= 40 {
 		return nil, errors.New("invalid object identifier")
@@ -377,43 +386,6 @@ func marshalObjectIdentifier(oid []int) (ret []byte, err error) {
 
 	ret = out.Bytes()
 	return
-}
-
-func marshalOID(oid string) ([]byte, error) {
-	var err error
-
-	// Encode the oid
-	oid = strings.Trim(oid, ".")
-	oidParts := strings.Split(oid, ".")
-	oidBytes := make([]int, len(oidParts))
-
-	// Convert the string OID to an array of integers
-	for i := 0; i < len(oidParts); i++ {
-		oidBytes[i], err = strconv.Atoi(oidParts[i])
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse OID: %s", err.Error())
-		}
-	}
-
-	mOid, err := marshalObjectIdentifier(oidBytes)
-
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal OID: %s", err.Error())
-	}
-
-	return mOid, err
-}
-
-func oidToString(oid []int) (ret string) {
-	oidAsString := make([]string, len(oid)+1)
-
-	// used for appending of the first dot
-	oidAsString[0] = ""
-	for i := range oid {
-		oidAsString[i+1] = strconv.Itoa(oid[i])
-	}
-
-	return strings.Join(oidAsString, ".")
 }
 
 // TODO no tests
@@ -509,18 +481,18 @@ func parseLength(bytes []byte) (length int, cursor int) {
 // parseObjectIdentifier parses an OBJECT IDENTIFIER from the given bytes and
 // returns it. An object identifier is a sequence of variable length integers
 // that are assigned in a hierarchy.
-func parseObjectIdentifier(bytes []byte) (s []int, err error) {
+func parseObjectIdentifier(bytes []byte) (s types.Oid, err error) {
 	if len(bytes) == 0 {
-		return []int{0}, nil
+		return types.Oid{}, nil
 	}
 
 	// In the worst case, we get two elements from the first byte (which is
 	// encoded differently) and then every varint is a single byte long.
-	s = make([]int, len(bytes)+1)
+	s = make(types.Oid, len(bytes)+1)
 
 	// The first byte is 40*value1 + value2:
-	s[0] = int(bytes[0]) / 40
-	s[1] = int(bytes[0]) % 40
+	s[0] = types.SmiSubId(bytes[0]) / 40
+	s[1] = types.SmiSubId(bytes[0]) % 40
 	i := 2
 	for offset := 1; offset < len(bytes); i++ {
 		var v int
@@ -528,7 +500,7 @@ func parseObjectIdentifier(bytes []byte) (s []int, err error) {
 		if err != nil {
 			return
 		}
-		s[i] = v
+		s[i] = types.SmiSubId(v)
 	}
 	s = s[0:i]
 	return

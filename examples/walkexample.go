@@ -12,9 +12,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/soniah/gosnmp"
+	"github.com/sleepinggenius2/gosnmp"
 )
 
+// nolint:typecheck
 func main() {
 	flag.Usage = func() {
 		fmt.Printf("Usage:\n")
@@ -56,8 +57,9 @@ func main() {
 	}
 }
 
+// nolint:typecheck
 func printValue(pdu gosnmp.SnmpPDU) error {
-	fmt.Printf("%s = ", pdu.Name)
+	fmt.Printf("%s = ", pdu.Oid)
 
 	switch pdu.Type {
 	case gosnmp.OctetString:

@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/sleepinggenius2/gosmi/types"
 )
 
 // Tests in alphabetical order of function being tested
@@ -216,10 +218,10 @@ var testsEnmarshal = []testsEnmarshalT{
 		0x82, // finish
 		[]testsEnmarshalVarbindPosition{
 			{".1.3.6.1.2.1.1.3.0", 0x1e, 0x2f, TimeTicks, uint32(18542501)},
-			{".1.3.6.1.6.3.1.1.4.1.0", 0x30, 0x45, ObjectIdentifier, ".1.3.6.1.2.1.1"},
+			{".1.3.6.1.6.3.1.1.4.1.0", 0x30, 0x45, ObjectIdentifier, types.OidMustFromString(".1.3.6.1.2.1.1")},
 			{".1.3.6.1.2.1.1.1.0", 0x46, 0x59, OctetString, "red laptop"},
 			{".1.3.6.1.2.1.1.7.0", 0x5e, 0x6c, Integer, 5},
-			{".1.3.6.1.2.1.1.2", 0x6d, 0x82, ObjectIdentifier, ".1.3.6.1.4.1.2.3.4.5"},
+			{".1.3.6.1.2.1.1.2", 0x6d, 0x82, ObjectIdentifier, types.OidMustFromString(".1.3.6.1.4.1.2.3.4.5")},
 		},
 	},
 }
@@ -229,7 +231,7 @@ var testsEnmarshal = []testsEnmarshalT{
 // vbPosPdus returns a slice of oids in the given test
 func vbPosPdus(test testsEnmarshalT) (pdus []SnmpPDU) {
 	for _, vbp := range test.vbPositions {
-		pdu := SnmpPDU{vbp.oid, vbp.pduType, vbp.pduValue, nil}
+		pdu := SnmpPDU{vbp.pduType, vbp.pduValue, nil, types.OidMustFromString(vbp.oid)}
 		pdus = append(pdus, pdu)
 	}
 	return
@@ -268,7 +270,7 @@ func TestEnmarshalVarbind(t *testing.T) {
 
 	for _, test := range testsEnmarshal {
 		for j, test2 := range test.vbPositions {
-			snmppdu := &SnmpPDU{test2.oid, test2.pduType, test2.pduValue, nil}
+			snmppdu := &SnmpPDU{test2.pduType, test2.pduValue, nil, types.OidMustFromString(test2.oid)}
 			testBytes, err := marshalVarbind(snmppdu)
 			if err != nil {
 				t.Errorf("#%s:%d:%s err returned: %v",
@@ -358,42 +360,42 @@ var testsUnmarshal = []struct {
 			ErrorIndex: 0,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.2.1.1.7.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.7.0"),
 					Type:  Integer,
 					Value: 104,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.2.1.10.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.2.1.10.1"),
 					Type:  Counter32,
 					Value: 271070065,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.2.1.5.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.2.1.5.1"),
 					Type:  Gauge32,
 					Value: 100000000,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.4.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.4.0"),
 					Type:  OctetString,
 					Value: []byte("Administrator"),
 				},
 				{
-					Name:  ".1.3.6.1.2.1.43.5.1.1.15.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.43.5.1.1.15.1"),
 					Type:  Null,
 					Value: nil,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.4.21.1.1.127.0.0.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.4.21.1.1.127.0.0.1"),
 					Type:  IPAddress,
 					Value: "127.0.0.1",
 				},
 				{
-					Name:  ".1.3.6.1.4.1.23.2.5.1.1.1.4.2",
+					Oid:   types.OidMustFromString(".1.3.6.1.4.1.23.2.5.1.1.1.4.2"),
 					Type:  OctetString,
 					Value: []byte{0x00, 0x15, 0x99, 0x37, 0x76, 0x2b},
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.3.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.3.0"),
 					Type:  TimeTicks,
 					Value: 318870100,
 				},
@@ -410,54 +412,54 @@ var testsUnmarshal = []struct {
 			ErrorIndex: 0,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.2.1.1.7.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.7.0"),
 					Type:  Integer,
 					Value: 78,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.2.1.2.6",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.2.1.2.6"),
 					Type:  OctetString,
 					Value: []byte("GigabitEthernet0"),
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.2.1.5.3",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.2.1.5.3"),
 					Type:  Gauge32,
 					Value: uint(4294967295),
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.2.1.7.2",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.2.1.7.2"),
 					Type:  NoSuchInstance,
 					Value: nil,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.2.1.9.3",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.2.1.9.3"),
 					Type:  TimeTicks,
 					Value: 2970,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.3.1.1.2.10.1.10.11.0.17",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.3.1.1.2.10.1.10.11.0.17"),
 					Type:  OctetString,
 					Value: []byte{0x00, 0x07, 0x7d, 0x4d, 0x09, 0x00},
 				},
 				{
-					Name:  ".1.3.6.1.2.1.3.1.1.3.10.1.10.11.0.2",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.3.1.1.3.10.1.10.11.0.2"),
 					Type:  IPAddress,
 					Value: "10.11.0.2",
 				},
 				{
-					Name:  ".1.3.6.1.2.1.4.20.1.1.110.143.197.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.4.20.1.1.110.143.197.1"),
 					Type:  IPAddress,
 					Value: "110.143.197.1",
 				},
 				{
-					Name:  ".1.3.6.1.66.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.66.1"),
 					Type:  NoSuchObject,
 					Value: nil,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.2.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.2.0"),
 					Type:  ObjectIdentifier,
-					Value: ".1.3.6.1.4.1.9.1.1166",
+					Value: types.OidMustFromString(".1.3.6.1.4.1.9.1.1166"),
 				},
 			},
 		},
@@ -472,7 +474,7 @@ var testsUnmarshal = []struct {
 			ErrorIndex: 0,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.4.1.318.1.1.4.4.2.1.3.5",
+					Oid:   types.OidMustFromString(".1.3.6.1.4.1.318.1.1.4.4.2.1.3.5"),
 					Type:  Integer,
 					Value: 1,
 				},
@@ -489,7 +491,7 @@ var testsUnmarshal = []struct {
 			ErrorIndex: 0,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.4.1.318.1.1.4.4.2.1.3.5",
+					Oid:   types.OidMustFromString(".1.3.6.1.4.1.318.1.1.4.4.2.1.3.5"),
 					Type:  Integer,
 					Value: 2,
 				},
@@ -506,34 +508,34 @@ var testsUnmarshal = []struct {
 			ErrorIndex: 0,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.2.1.3.1.1.3.2.1.192.168.104.2",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.3.1.1.3.2.1.192.168.104.2"),
 					Type:  IPAddress,
 					Value: "192.168.104.2",
 				},
 				{
-					Name:  ".1.3.6.1.2.1.92.1.2.1.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.92.1.2.1.0"),
 					Type:  Counter32,
 					Value: 0,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.3.3",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.3.3"),
 					Type:  OctetString,
 					Value: []byte("The MIB module for managing IP and ICMP implementations"),
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.2",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.2"),
 					Type:  TimeTicks,
 					Value: 21,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.1.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.1.0"),
 					Type:  Integer,
 					Value: 3,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.2.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.2.0"),
 					Type:  ObjectIdentifier,
-					Value: ".1.3.6.1.4.1.8072.3.2.10",
+					Value: types.OidMustFromString(".1.3.6.1.4.1.8072.3.2.10"),
 				},
 			},
 		},
@@ -548,52 +550,52 @@ var testsUnmarshal = []struct {
 			MaxRepetitions: 10,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.1"),
 					Type:  TimeTicks,
 					Value: 21,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.2",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.2"),
 					Type:  TimeTicks,
 					Value: 21,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.3",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.3"),
 					Type:  TimeTicks,
 					Value: 21,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.4",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.4"),
 					Type:  TimeTicks,
 					Value: 21,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.5",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.5"),
 					Type:  TimeTicks,
 					Value: 21,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.6",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.6"),
 					Type:  TimeTicks,
 					Value: 23,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.7",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.7"),
 					Type:  TimeTicks,
 					Value: 23,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.1.9.1.4.8",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.1.9.1.4.8"),
 					Type:  TimeTicks,
 					Value: 23,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.1.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.1.0"),
 					Type:  Integer,
 					Value: 3,
 				},
 				{
-					Name:  ".1.3.6.1.2.1.2.2.1.1.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.2.2.1.1.1"),
 					Type:  Integer,
 					Value: 1,
 				},
@@ -620,7 +622,7 @@ var testsUnmarshal = []struct {
 			ErrorIndex: 0,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.2.1.31.1.1.1.10.1",
+					Oid:   types.OidMustFromString(".1.3.6.1.2.1.31.1.1.1.10.1"),
 					Type:  Counter64,
 					Value: 1527943,
 				},
@@ -637,7 +639,7 @@ var testsUnmarshal = []struct {
 			ErrorIndex: 0,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.4.1.6574.4.2.12.1.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.4.1.6574.4.2.12.1.0"),
 					Type:  OpaqueFloat,
 					Value: float32(10.0),
 				},
@@ -654,7 +656,7 @@ var testsUnmarshal = []struct {
 			ErrorIndex: 0,
 			Variables: []SnmpPDU{
 				{
-					Name:  ".1.3.6.1.4.1.6574.4.2.12.1.0",
+					Oid:   types.OidMustFromString(".1.3.6.1.4.1.6574.4.2.12.1.0"),
 					Type:  OpaqueDouble,
 					Value: float64(10.0),
 				},
@@ -721,8 +723,8 @@ SANITY:
 			}
 			vbr := res.Variables[n]
 
-			if vbr.Name != vb.Name {
-				t.Errorf("#%d:%d Name result: %v, test: %v", i, n, vbr.Name, vb.Name)
+			if !vbr.Oid.Equals(vb.Oid) {
+				t.Errorf("#%d:%d Name result: %v, test: %v", i, n, vbr.Oid, vb.Oid)
 			}
 			if vbr.Type != vb.Type {
 				t.Errorf("#%d:%d Type result: %v, test: %v", i, n, vbr.Type, vb.Type)
@@ -739,8 +741,12 @@ SANITY:
 				if !bytes.Equal(vb.Value.([]byte), vbr.Value.([]byte)) {
 					t.Errorf("#%d:%d Value result: %v, test: %v", i, n, vbr.Value, vb.Value)
 				}
-			case IPAddress, ObjectIdentifier:
+			case IPAddress:
 				if vb.Value != vbr.Value {
+					t.Errorf("#%d:%d Value result: %v, test: %v", i, n, vbr.Value, vb.Value)
+				}
+			case ObjectIdentifier:
+				if !vb.Value.(types.Oid).Equals(vbr.Value.(types.Oid)) {
 					t.Errorf("#%d:%d Value result: %v, test: %v", i, n, vbr.Value, vb.Value)
 				}
 			case Null, NoSuchObject, NoSuchInstance:
@@ -1336,7 +1342,7 @@ func TestSendOneRequest_dups(t *testing.T) {
 
 			rspPkt := x.mkSnmpPacket(GetResponse, []SnmpPDU{
 				{
-					Name:  ".1.2",
+					Oid:   types.Oid{1, 2},
 					Type:  Integer,
 					Value: 123,
 				},
@@ -1353,7 +1359,7 @@ func TestSendOneRequest_dups(t *testing.T) {
 		}
 	}()
 
-	pdus := []SnmpPDU{SnmpPDU{Name: ".1.2", Type: Null}}
+	pdus := []SnmpPDU{SnmpPDU{Oid: types.Oid{1, 2}, Type: Null}}
 	reqPkt := x.mkSnmpPacket(GetResponse, pdus, 0, 0) //not actually a GetResponse, but we need something our test server can unmarshal
 
 	_, err = x.sendOneRequest(reqPkt, true)
@@ -1400,7 +1406,7 @@ func BenchmarkSendOneRequest(b *testing.B) {
 		}
 	}()
 
-	pdus := []SnmpPDU{SnmpPDU{Name: ".1.3.6.1.2.1.31.1.1.1.10.1", Type: Null}}
+	pdus := []SnmpPDU{SnmpPDU{Oid: types.OidMustFromString(".1.3.6.1.2.1.31.1.1.1.10.1"), Type: Null}}
 	reqPkt := x.mkSnmpPacket(GetRequest, pdus, 0, 0)
 
 	// make sure everything works before starting the test

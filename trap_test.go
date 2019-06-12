@@ -12,6 +12,8 @@ import (
 	"os" //"io/ioutil"
 	"testing"
 	"time"
+
+	"github.com/sleepinggenius2/gosmi/types"
 )
 
 const (
@@ -22,14 +24,17 @@ const (
 	trapTestPort       = 9162
 	trapTestPortString = "9162"
 
-	trapTestOid     = ".1.2.1234.4.5"
 	trapTestPayload = "TRAPTEST1234"
 
-	trapTestEnterpriseOid = ".1.2.1234"
-	trapTestAgentAddress  = "127.0.0.1"
-	trapTestGenericTrap   = 6
-	trapTestSpecificTrap  = 55
-	trapTestTimestamp     = 300
+	trapTestAgentAddress = "127.0.0.1"
+	trapTestGenericTrap  = 6
+	trapTestSpecificTrap = 55
+	trapTestTimestamp    = 300
+)
+
+var (
+	trapTestOid           = types.OidMustFromString(".1.2.1234.4.5")
+	trapTestEnterpriseOid = types.OidMustFromString(".1.2.1234")
 )
 
 var testsUnmarshalTrap = []struct {
@@ -106,7 +111,7 @@ func makeTestTrapHandler(t *testing.T, done chan int, version SnmpVersion) func(
 		// log.Printf("got trapdata from %s\n", addr.IP)
 
 		if version == Version1 {
-			if packet.Enterprise != trapTestEnterpriseOid {
+			if !packet.Enterprise.Equals(trapTestEnterpriseOid) {
 				t.Fatalf("incorrect trap Enterprise OID received, expected %s got %s", trapTestEnterpriseOid, packet.Enterprise)
 				done <- 0
 			}
@@ -135,8 +140,8 @@ func makeTestTrapHandler(t *testing.T, done chan int, version SnmpVersion) func(
 				// log.Printf("OID: %s, string: %x\n", v.Name, b)
 
 				// Only one OctetString in the payload, so it must be the expected one
-				if v.Name != trapTestOid {
-					t.Fatalf("incorrect trap OID received, expected %s got %s", trapTestOid, v.Name)
+				if !v.Oid.Equals(trapTestOid) {
+					t.Fatalf("incorrect trap OID received, expected %s got %s", trapTestOid, v.Oid)
 					done <- 0
 				}
 				if string(b) != trapTestPayload {
@@ -194,7 +199,7 @@ func TestSendTrapBasic(t *testing.T) {
 	defer ts.Conn.Close()
 
 	pdu := SnmpPDU{
-		Name:  trapTestOid,
+		Oid:   trapTestOid,
 		Type:  OctetString,
 		Value: trapTestPayload,
 	}
@@ -262,7 +267,7 @@ func TestSendTrapWithoutWaitingOnListen(t *testing.T) {
 	defer ts.Conn.Close()
 
 	pdu := SnmpPDU{
-		Name:  trapTestOid,
+		Oid:   trapTestOid,
 		Type:  OctetString,
 		Value: trapTestPayload,
 	}
@@ -339,7 +344,7 @@ func TestSendV1Trap(t *testing.T) {
 	defer ts.Conn.Close()
 
 	pdu := SnmpPDU{
-		Name:  trapTestOid,
+		Oid:   trapTestOid,
 		Type:  OctetString,
 		Value: trapTestPayload,
 	}

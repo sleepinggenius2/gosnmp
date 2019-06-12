@@ -8,9 +8,11 @@ import (
 	"log"
 	"os"
 
-	g "github.com/soniah/gosnmp"
+	"github.com/sleepinggenius2/gosmi/types"
+	g "github.com/sleepinggenius2/gosnmp"
 )
 
+// nolint:typecheck
 func main() {
 
 	// Default is a pointer to a GoSNMP struct that contains sensible defaults
@@ -28,9 +30,9 @@ func main() {
 	defer g.Default.Conn.Close()
 
 	pdu := g.SnmpPDU{
-		Name:  ".1.3.6.1.6.3.1.1.4.1.0",
+		Oid:   types.Oid{1, 3, 6, 1, 6, 3, 1, 1, 4, 1, 0},
 		Type:  g.ObjectIdentifier,
-		Value: ".1.3.6.1.6.3.1.1.5.1",
+		Value: types.Oid{1, 3, 6, 1, 6, 3, 1, 1, 5, 1},
 	}
 
 	trap := g.SnmpTrap{

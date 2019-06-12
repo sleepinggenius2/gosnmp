@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/sleepinggenius2/gosmi/types"
 )
 
 //
@@ -64,7 +66,7 @@ type SnmpTrap struct {
 	Variables []SnmpPDU
 
 	// These fields are required for SNMPV1 Trap Headers
-	Enterprise   string
+	Enterprise   types.Oid
 	AgentAddress string
 	GenericTrap  int
 	SpecificTrap int
@@ -95,6 +97,15 @@ const (
 )
 
 const rxBufSize = 65535 // max size of IPv4 & IPv6 packet
+
+var (
+	UnsupportedSecLevels = types.Oid{1, 3, 6, 1, 6, 3, 15, 1, 1, 1, 0}
+	NotInTimeWindows     = types.Oid{1, 3, 6, 1, 6, 3, 15, 1, 1, 2, 0}
+	UnknownUserNames     = types.Oid{1, 3, 6, 1, 6, 3, 15, 1, 1, 3, 0}
+	UnknownEngineIDs     = types.Oid{1, 3, 6, 1, 6, 3, 15, 1, 1, 4, 0}
+	WrongDigests         = types.Oid{1, 3, 6, 1, 6, 3, 15, 1, 1, 5, 0}
+	DecryptionErrors     = types.Oid{1, 3, 6, 1, 6, 3, 15, 1, 1, 6, 0}
+)
 
 // Logger is an interface used for debugging. Both Print and
 // Printf have the same interfaces as Package Log in the std library. The
@@ -251,10 +262,8 @@ func (x *GoSNMP) sendOneRequest(packetOut *SnmpPacket, wait bool) (result *SnmpP
 			// (usmStatsNotInTimeWindows [1.3.6.1.6.3.15.1.1.2.0] will be handled by the calling
 			// function, and retransmitted.  All others need to be handled by user code)
 			if result.Version == Version3 && len(result.Variables) == 1 && result.PDUType == Report {
-				switch result.Variables[0].Name {
-				case ".1.3.6.1.6.3.15.1.1.1.0", ".1.3.6.1.6.3.15.1.1.2.0",
-					".1.3.6.1.6.3.15.1.1.3.0", ".1.3.6.1.6.3.15.1.1.4.0",
-					".1.3.6.1.6.3.15.1.1.5.0", ".1.3.6.1.6.3.15.1.1.6.0":
+				oid := result.Variables[0].Oid
+				if !oid.Before(UnsupportedSecLevels) && !oid.After(DecryptionErrors) {
 					break waitingResponse
 				}
 			}
@@ -325,7 +334,7 @@ func (x *GoSNMP) send(packetOut *SnmpPacket, wait bool) (result *SnmpPacket, err
 		err = x.storeSecurityParameters(result)
 
 		// detect out-of-time-window error and retransmit with updated auth engine parameters
-		if len(result.Variables) == 1 && result.Variables[0].Name == ".1.3.6.1.6.3.15.1.1.2.0" {
+		if len(result.Variables) == 1 && result.Variables[0].Oid.Equals(NotInTimeWindows) {
 			x.logPrint("WARNING detected out-of-time-window ERROR")
 			err = x.updatePktSecurityParameters(packetOut)
 			if err != nil {
@@ -337,7 +346,7 @@ func (x *GoSNMP) send(packetOut *SnmpPacket, wait bool) (result *SnmpPacket, err
 	}
 
 	// detect unknown engine id error and retransmit with updated engine id
-	if len(result.Variables) == 1 && result.Variables[0].Name == ".1.3.6.1.6.3.15.1.1.4.0" {
+	if len(result.Variables) == 1 && result.Variables[0].Oid.Equals(UnknownEngineIDs) {
 		x.logPrint("WARNING detected unknown enginer id ERROR")
 		err = x.updatePktSecurityParameters(packetOut)
 		if err != nil {
@@ -407,7 +416,7 @@ func (packet *SnmpPacket) marshalSNMPV1TrapHeader() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	// marshal OID
-	oidBytes, err := marshalOID(packet.Enterprise)
+	oidBytes, err := marshalObjectIdentifier(packet.Enterprise)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal OID: %s", err.Error())
 	}
@@ -546,7 +555,7 @@ func (packet *SnmpPacket) marshalVBL() ([]byte, error) {
 
 // marshal a varbind
 func marshalVarbind(pdu *SnmpPDU) ([]byte, error) {
-	oid, err := marshalOID(pdu.Name)
+	oid, err := marshalObjectIdentifier(pdu.Oid)
 	if err != nil {
 		return nil, err
 	}
@@ -664,8 +673,8 @@ func marshalVarbind(pdu *SnmpPDU) ([]byte, error) {
 		//Oid
 		tmpBuf.Write([]byte{byte(ObjectIdentifier), byte(len(oid))})
 		tmpBuf.Write(oid)
-		value := pdu.Value.(string)
-		oidBytes, err := marshalOID(value)
+		value := pdu.Value.(types.Oid)
+		oidBytes, err := marshalObjectIdentifier(value)
 		pdu.Check(err)
 
 		//Oid data
@@ -881,8 +890,8 @@ func (x *GoSNMP) unmarshalTrapV1(packet []byte, response *SnmpPacket) error {
 		return fmt.Errorf("Error parsing SNMP packet error: %s", err.Error())
 	}
 	cursor += count
-	if Enterprise, ok := rawEnterprise.([]int); ok {
-		response.Enterprise = oidToString(Enterprise)
+	if Enterprise, ok := rawEnterprise.(types.Oid); ok {
+		response.Enterprise = Enterprise
 		x.logPrintf("Enterprise: %+v", Enterprise)
 	}
 
@@ -969,22 +978,20 @@ func (x *GoSNMP) unmarshalVBL(packet []byte, response *SnmpPacket) error {
 		}
 		cursor += oidLength
 
-		var oid []int
+		var oid types.Oid
 		var ok bool
-		if oid, ok = rawOid.([]int); !ok {
+		if oid, ok = rawOid.(types.Oid); !ok {
 			return fmt.Errorf("unable to type assert rawOid |%v| to []int", rawOid)
 		}
-		oidStr := oidToString(oid)
-		x.logPrintf("OID: %s", oidStr)
+		x.logPrintf("OID: %s", oid)
 
 		// Parse Value
-		v, err := x.decodeValue(packet[cursor:], "value")
+		v, valueLength, err := x.decodeValue(packet[cursor:], "value")
 		if err != nil {
 			return fmt.Errorf("Error decoding value: %v", err)
 		}
-		valueLength, _ := parseLength(packet[cursor:])
 		cursor += valueLength
-		response.Variables = append(response.Variables, SnmpPDU{oidStr, v.Type, v.Value, x.Logger, oid})
+		response.Variables = append(response.Variables, SnmpPDU{v.Type, v.Value, x.Logger, oid})
 	}
 	return nil
 }

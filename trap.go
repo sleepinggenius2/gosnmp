@@ -11,7 +11,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sleepinggenius2/gosmi/types"
 )
+
+var sysUptime = types.Oid{1, 3, 6, 1, 2, 2, 2, 3, 0}
 
 //
 // Sending Traps ie GoSNMP acting as an Agent
@@ -47,7 +51,7 @@ func (x *GoSNMP) SendTrap(trap SnmpTrap) (result *SnmpPacket, err error) {
 
 		if trap.Variables[0].Type != TimeTicks {
 			now := uint32(time.Now().Unix())
-			timetickPDU := SnmpPDU{"1.3.6.1.2.1.1.3.0", TimeTicks, now, x.Logger, nil}
+			timetickPDU := SnmpPDU{TimeTicks, now, x.Logger, sysUptime}
 			// prepend timetickPDU
 			trap.Variables = append([]SnmpPDU{timetickPDU}, trap.Variables...)
 		}

@@ -20,9 +20,10 @@ import (
 	"os"
 	"path/filepath"
 
-	g "github.com/soniah/gosnmp"
+	g "github.com/sleepinggenius2/gosnmp"
 )
 
+// nolint:typecheck
 func main() {
 	flag.Usage = func() {
 		fmt.Printf("Usage:\n")
@@ -47,7 +48,7 @@ func myTrapHandler(packet *g.SnmpPacket, addr *net.UDPAddr) {
 		switch v.Type {
 		case g.OctetString:
 			b := v.Value.([]byte)
-			fmt.Printf("OID: %s, string: %x\n", v.Name, b)
+			fmt.Printf("OID: %s, string: %x\n", v.Oid, b)
 
 		default:
 			log.Printf("trap: %+v\n", v)

@@ -23,7 +23,7 @@ before_install:
  - export GOARCH=$TRAVIS_GOARCH
 
 install:
- - go get github.com/soniah/gosnmp
+ - go get github.com/sleepinggenius2/gosnmp
  - go get github.com/stretchr/testify/assert
  - go get -u golang.org/x/tools/cmd/goimports
  - sudo ./snmp_users.sh

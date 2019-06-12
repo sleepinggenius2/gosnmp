@@ -1,3 +1,7 @@
+## v1.23.0
+
+* convert from using strings to Oids
+
 ## v1.22.0
 
 * travis now failing build when goimports needs running

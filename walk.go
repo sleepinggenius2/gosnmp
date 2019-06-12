@@ -6,16 +6,13 @@ package gosnmp
 
 import (
 	"fmt"
-	"strings"
+
+	"github.com/sleepinggenius2/gosmi/types"
 )
 
-func (x *GoSNMP) walk(getRequestType PDUType, rootOid string, walkFn WalkFunc) error {
-	if rootOid == "" || rootOid == "." {
+func (x *GoSNMP) walk(getRequestType PDUType, rootOid types.Oid, walkFn WalkFunc) error {
+	if len(rootOid) == 0 {
 		rootOid = baseOid
-	}
-
-	if !strings.HasPrefix(rootOid, ".") {
-		rootOid = string(".") + rootOid
 	}
 
 	oid := rootOid
@@ -45,11 +42,11 @@ RequestLoop:
 
 		switch getRequestType {
 		case GetBulkRequest:
-			response, err = x.GetBulk([]string{oid}, uint8(x.NonRepeaters), uint8(maxReps))
+			response, err = x.GetBulkOID([]types.Oid{oid}, uint8(x.NonRepeaters), uint8(maxReps))
 		case GetNextRequest:
-			response, err = x.GetNext([]string{oid})
+			response, err = x.GetNextOID([]types.Oid{oid})
 		case GetRequest:
-			response, err = x.Get([]string{oid})
+			response, err = x.GetOID([]types.Oid{oid})
 		default:
 			response, err = nil, fmt.Errorf("Unsupported request type: %d", getRequestType)
 		}
@@ -71,7 +68,7 @@ RequestLoop:
 				x.Logger.Printf("BulkWalk terminated with type 0x%x", pdu.Type)
 				break RequestLoop
 			}
-			if !strings.HasPrefix(pdu.Name, rootOid+".") {
+			if !pdu.Oid.ChildOf(rootOid) {
 				// Not in the requested root range.
 				// if this is the first request, and the first variable in that request
 				// and this condition is triggered - the first result is out of range
@@ -85,8 +82,8 @@ RequestLoop:
 				break RequestLoop
 			}
 
-			if checkIncreasing && pdu.Name == oid {
-				return fmt.Errorf("OID not increasing: %s", pdu.Name)
+			if checkIncreasing && !pdu.Oid.After(oid) {
+				return fmt.Errorf("OID not increasing: %s", pdu.Oid)
 			}
 
 			// Report our pdu
@@ -95,14 +92,14 @@ RequestLoop:
 			}
 		}
 		// Save last oid for next request
-		oid = response.Variables[len(response.Variables)-1].Name
+		oid = response.Variables[len(response.Variables)-1].Oid
 
 	}
 	x.Logger.Printf("BulkWalk completed in %d requests", requests)
 	return nil
 }
 
-func (x *GoSNMP) walkAll(getRequestType PDUType, rootOid string) (results []SnmpPDU, err error) {
+func (x *GoSNMP) walkAll(getRequestType PDUType, rootOid types.Oid) (results []SnmpPDU, err error) {
 	err = x.walk(getRequestType, rootOid, func(dataUnit SnmpPDU) error {
 		results = append(results, dataUnit)
 		return nil

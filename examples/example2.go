@@ -11,9 +11,10 @@ import (
 	"strconv"
 	"time"
 
-	g "github.com/soniah/gosnmp"
+	g "github.com/sleepinggenius2/gosnmp"
 )
 
+// nolint:typecheck
 func main() {
 
 	// get Target and Port from environment
@@ -50,7 +51,7 @@ func main() {
 	}
 
 	for i, variable := range result.Variables {
-		fmt.Printf("%d: oid: %s ", i, variable.Name)
+		fmt.Printf("%d: oid: %s ", i, variable.Oid)
 
 		// the Value of each variable returned by Get() implements
 		// interface{}. You could do a type switch...

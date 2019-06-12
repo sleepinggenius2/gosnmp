@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-reuseport"
+	"github.com/sleepinggenius2/gosmi/types"
 )
 
 const (
@@ -30,12 +31,12 @@ const (
 	// to change this in the GoSNMP struct
 	MaxOids = 60
 
-	// Base OID for MIB-2 defined SNMP variables
-	baseOid = ".1.3.6.1.2.1"
-
 	// Java SNMP uses 50, snmp-net uses 10
 	defaultMaxRepetitions = 50
 )
+
+// Base OID for MIB-2 defined SNMP variables
+var baseOid = types.Oid{1, 3, 6, 1, 2, 1}
 
 // GoSNMP represents GoSNMP library state
 type GoSNMP struct {
@@ -137,9 +138,6 @@ var Default = &GoSNMP{
 
 // SnmpPDU will be used when doing SNMP Set's
 type SnmpPDU struct {
-	// Name is an oid in string format eg ".1.3.6.1.4.9.27"
-	Name string
-
 	// The type of the value eg Integer
 	Type Asn1BER
 
@@ -150,8 +148,8 @@ type SnmpPDU struct {
 	// Logger implements the Logger interface
 	Logger Logger
 
-	// The oid as a slice of ints
-	Oid []int
+	// The oid as an Oid
+	Oid types.Oid
 }
 
 // AsnExtensionID mask to identify types > 30 in subsequent byte
@@ -351,17 +349,37 @@ func (x *GoSNMP) mkSnmpPacket(pdutype PDUType, pdus []SnmpPDU, nonRepeaters uint
 	}
 }
 
+func getOidsFromStrings(oids []string) ([]types.Oid, error) {
+	outOids := make([]types.Oid, len(oids))
+	for i := range oids {
+		outOid, err := types.OidFromString(oids[i])
+		if err != nil {
+			return nil, err
+		}
+		outOids[i] = outOid
+	}
+	return outOids, nil
+}
+
 // Get sends an SNMP GET request
 func (x *GoSNMP) Get(oids []string) (result *SnmpPacket, err error) {
+	outOids, err := getOidsFromStrings(oids)
+	if err != nil {
+		return nil, err
+	}
+	return x.GetOID(outOids)
+}
+
+// GetOID sends an SNMP GET request
+func (x *GoSNMP) GetOID(oids []types.Oid) (result *SnmpPacket, err error) {
 	oidCount := len(oids)
 	if oidCount > x.MaxOids {
-		return nil, fmt.Errorf("oid count (%d) is greater than MaxOids (%d)",
-			oidCount, x.MaxOids)
+		return nil, fmt.Errorf("oid count (%d) is greater than MaxOids (%d)", oidCount, x.MaxOids)
 	}
 	// convert oids slice to pdu slice
 	var pdus []SnmpPDU
 	for _, oid := range oids {
-		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger, nil})
+		pdus = append(pdus, SnmpPDU{Null, nil, x.Logger, oid})
 	}
 	// build up SnmpPacket
 	packetOut := x.mkSnmpPacket(GetRequest, pdus, 0, 0)
@@ -383,16 +401,24 @@ func (x *GoSNMP) Set(pdus []SnmpPDU) (result *SnmpPacket, err error) {
 
 // GetNext sends an SNMP GETNEXT request
 func (x *GoSNMP) GetNext(oids []string) (result *SnmpPacket, err error) {
+	outOids, err := getOidsFromStrings(oids)
+	if err != nil {
+		return nil, err
+	}
+	return x.GetNextOID(outOids)
+}
+
+// GetNextOID sends an SNMP GETNEXT request
+func (x *GoSNMP) GetNextOID(oids []types.Oid) (result *SnmpPacket, err error) {
 	oidCount := len(oids)
 	if oidCount > x.MaxOids {
-		return nil, fmt.Errorf("oid count (%d) is greater than MaxOids (%d)",
-			oidCount, x.MaxOids)
+		return nil, fmt.Errorf("oid count (%d) is greater than MaxOids (%d)", oidCount, x.MaxOids)
 	}
 
 	// convert oids slice to pdu slice
 	var pdus []SnmpPDU
 	for _, oid := range oids {
-		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger, nil})
+		pdus = append(pdus, SnmpPDU{Null, nil, x.Logger, oid})
 	}
 
 	// Marshal and send the packet
@@ -405,16 +431,26 @@ func (x *GoSNMP) GetNext(oids []string) (result *SnmpPacket, err error) {
 //
 // For maxRepetitions greater than 255, use BulkWalk() or BulkWalkAll()
 func (x *GoSNMP) GetBulk(oids []string, nonRepeaters uint8, maxRepetitions uint8) (result *SnmpPacket, err error) {
+	outOids, err := getOidsFromStrings(oids)
+	if err != nil {
+		return nil, err
+	}
+	return x.GetBulkOID(outOids, nonRepeaters, maxRepetitions)
+}
+
+// GetBulkOID sends an SNMP GETBULK request
+//
+// For maxRepetitions greater than 255, use BulkWalk() or BulkWalkAll()
+func (x *GoSNMP) GetBulkOID(oids []types.Oid, nonRepeaters uint8, maxRepetitions uint8) (result *SnmpPacket, err error) {
 	oidCount := len(oids)
 	if oidCount > x.MaxOids {
-		return nil, fmt.Errorf("oid count (%d) is greater than MaxOids (%d)",
-			oidCount, x.MaxOids)
+		return nil, fmt.Errorf("oid count (%d) is greater than MaxOids (%d)", oidCount, x.MaxOids)
 	}
 
 	// convert oids slice to pdu slice
 	var pdus []SnmpPDU
 	for _, oid := range oids {
-		pdus = append(pdus, SnmpPDU{oid, Null, nil, x.Logger, nil})
+		pdus = append(pdus, SnmpPDU{Null, nil, x.Logger, oid})
 	}
 
 	// Marshal and send the packet
@@ -524,6 +560,18 @@ type WalkFunc func(dataUnit SnmpPDU) error
 // an error if either there is an underlaying SNMP error (e.g. GetBulk fails),
 // or if walkFn returns an error.
 func (x *GoSNMP) BulkWalk(rootOid string, walkFn WalkFunc) error {
+	oid, err := types.OidFromString(rootOid)
+	if err != nil {
+		return err
+	}
+	return x.BulkWalkOID(oid, walkFn)
+}
+
+// BulkWalkOID retrieves a subtree of values using GETBULK. As the tree is
+// walked walkFn is called for each new value. The function immediately returns
+// an error if either there is an underlaying SNMP error (e.g. GetBulkOID
+// fails), or if walkFn returns an error.
+func (x *GoSNMP) BulkWalkOID(rootOid types.Oid, walkFn WalkFunc) error {
 	return x.walk(GetBulkRequest, rootOid, walkFn)
 }
 
@@ -532,6 +580,18 @@ func (x *GoSNMP) BulkWalk(rootOid string, walkFn WalkFunc) error {
 // have set x.AppOpts to 'c', BulkWalkAll may loop indefinitely and cause an
 // Out Of Memory - use BulkWalk instead.
 func (x *GoSNMP) BulkWalkAll(rootOid string) (results []SnmpPDU, err error) {
+	oid, err := types.OidFromString(rootOid)
+	if err != nil {
+		return nil, err
+	}
+	return x.BulkWalkAllOID(oid)
+}
+
+// BulkWalkAllOID is similar to BulkWalkOID but returns a filled array of all
+// values rather than using a callback function to stream results. Caution: if
+// you have set x.AppOpts to 'c', BulkWalkAllOID may loop indefinitely and cause
+// an Out Of Memory - use BulkWalkOID instead.
+func (x *GoSNMP) BulkWalkAllOID(rootOid types.Oid) (results []SnmpPDU, err error) {
 	return x.walkAll(GetBulkRequest, rootOid)
 }
 
@@ -541,6 +601,19 @@ func (x *GoSNMP) BulkWalkAll(rootOid string) (results []SnmpPDU, err error) {
 // an error if either there is an underlaying SNMP error (e.g. GetNext fails),
 // or if walkFn returns an error.
 func (x *GoSNMP) Walk(rootOid string, walkFn WalkFunc) error {
+	oid, err := types.OidFromString(rootOid)
+	if err != nil {
+		return err
+	}
+	return x.WalkOID(oid, walkFn)
+}
+
+// WalkOID retrieves a subtree of values using GETNEXT - a request is made for
+// each value, unlike BulkWalk which does this operation in batches. As the tree
+// is walked walkFn is called for each new value. The function immediately
+// returns an error if either there is an underlaying SNMP error (e.g.
+// GetNextOID fails), or if walkFn returns an error.
+func (x *GoSNMP) WalkOID(rootOid types.Oid, walkFn WalkFunc) error {
 	return x.walk(GetNextRequest, rootOid, walkFn)
 }
 
@@ -549,6 +622,18 @@ func (x *GoSNMP) Walk(rootOid string, walkFn WalkFunc) error {
 // x.AppOpts to 'c', WalkAll may loop indefinitely and cause an Out Of Memory -
 // use Walk instead.
 func (x *GoSNMP) WalkAll(rootOid string) (results []SnmpPDU, err error) {
+	oid, err := types.OidFromString(rootOid)
+	if err != nil {
+		return nil, err
+	}
+	return x.WalkAllOID(oid)
+}
+
+// WalkAllOID is similar to Walk but returns a filled array of all values rather
+// than using a callback function to stream results. Caution: if you have set
+// x.AppOpts to 'c', WalkAllOID may loop indefinitely and cause an Out Of Memory
+// - use WalkOID instead.
+func (x *GoSNMP) WalkAllOID(rootOid types.Oid) (results []SnmpPDU, err error) {
 	return x.walkAll(GetNextRequest, rootOid)
 }
 
