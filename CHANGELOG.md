@@ -1,3 +1,9 @@
+# Changelog
+
+## v1.24.0
+
+* forces SNMPv1 to use non-bulk functions
+
 ## v1.23.0
 
 * convert from using strings to Oids

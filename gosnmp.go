@@ -442,6 +442,9 @@ func (x *GoSNMP) GetBulk(oids []string, nonRepeaters uint8, maxRepetitions uint8
 //
 // For maxRepetitions greater than 255, use BulkWalk() or BulkWalkAll()
 func (x *GoSNMP) GetBulkOID(oids []types.Oid, nonRepeaters uint8, maxRepetitions uint8) (result *SnmpPacket, err error) {
+	if x.Version == Version1 {
+		return x.GetOID(oids)
+	}
 	oidCount := len(oids)
 	if oidCount > x.MaxOids {
 		return nil, fmt.Errorf("oid count (%d) is greater than MaxOids (%d)", oidCount, x.MaxOids)
@@ -572,6 +575,9 @@ func (x *GoSNMP) BulkWalk(rootOid string, walkFn WalkFunc) error {
 // an error if either there is an underlaying SNMP error (e.g. GetBulkOID
 // fails), or if walkFn returns an error.
 func (x *GoSNMP) BulkWalkOID(rootOid types.Oid, walkFn WalkFunc) error {
+	if x.Version == Version1 {
+		return x.WalkOID(rootOid, walkFn)
+	}
 	return x.walk(GetBulkRequest, rootOid, walkFn)
 }
 
@@ -592,6 +598,9 @@ func (x *GoSNMP) BulkWalkAll(rootOid string) (results []SnmpPDU, err error) {
 // you have set x.AppOpts to 'c', BulkWalkAllOID may loop indefinitely and cause
 // an Out Of Memory - use BulkWalkOID instead.
 func (x *GoSNMP) BulkWalkAllOID(rootOid types.Oid) (results []SnmpPDU, err error) {
+	if x.Version == Version1 {
+		return x.WalkAllOID(rootOid)
+	}
 	return x.walkAll(GetBulkRequest, rootOid)
 }
 
